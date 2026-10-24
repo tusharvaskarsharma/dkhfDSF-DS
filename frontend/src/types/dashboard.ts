@@ -43,8 +43,11 @@ export interface DailyMetric {
 export interface EvaluationResponse {
   date_from: string;
   date_to: string;
+  cutoff_type: 'rolling_da' | 'snapshot' | 'latest';
+  da_cutoff_time: string;
   decision_cutoff: string | null;
   granularity: 'half_hourly' | 'hourly';
+  alignment_method?: string;
   metrics: AccuracyMetrics;
   intervals: EvaluationInterval[];
   daily_breakdown: DailyMetric[];
@@ -60,6 +63,7 @@ export interface VintageItem {
   lead_time_hours: number;
   is_eligible_before_cutoff: boolean;
   is_selected: boolean;
+  is_ex_post?: boolean;
 }
 
 export interface VintageEvolutionResponse {

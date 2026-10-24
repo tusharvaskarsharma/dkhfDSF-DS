@@ -63,8 +63,11 @@ class DailyMetric(BaseModel):
 class EvaluationResponse(BaseModel):
     date_from: str
     date_to: str
+    cutoff_type: str = "rolling_da"  # "rolling_da", "snapshot", "latest"
+    da_cutoff_time: str = "11:00"     # London local time
     decision_cutoff: Optional[str] = None
-    granularity: str = "half_hourly"
+    granularity: str = "hourly"       # "hourly" (default native) or "half_hourly"
+    alignment_method: str = "native_hourly"
     metrics: AccuracyMetrics
     intervals: List[EvaluationInterval]
     daily_breakdown: List[DailyMetric]
@@ -79,6 +82,7 @@ class VintageItem(BaseModel):
     lead_time_hours: float
     is_eligible_before_cutoff: bool
     is_selected: bool
+    is_ex_post: bool = False
 
 class VintageEvolutionResponse(BaseModel):
     delivery_time: str

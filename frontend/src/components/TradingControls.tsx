@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
-import { Calendar, Clock } from 'lucide-react';
+import { Calendar, Clock, Info } from 'lucide-react';
 
 interface TradingControlsProps {
   dateFrom: string;
   dateTo: string;
   onDateChange: (from: string, to: string) => void;
+  cutoffType: 'rolling_da' | 'snapshot' | 'latest';
+  onCutoffTypeChange: (type: 'rolling_da' | 'snapshot' | 'latest') => void;
+  daCutoffTime: string;
+  onDaCutoffTimeChange: (time: string) => void;
   decisionCutoff: string | null;
   onCutoffChange: (cutoff: string | null) => void;
   granularity: 'half_hourly' | 'hourly';
@@ -17,6 +21,10 @@ export const TradingControls: React.FC<TradingControlsProps> = ({
   dateFrom,
   dateTo,
   onDateChange,
+  cutoffType,
+  onCutoffTypeChange,
+  daCutoffTime,
+  onDaCutoffTimeChange,
   decisionCutoff,
   onCutoffChange,
   granularity,
@@ -24,37 +32,41 @@ export const TradingControls: React.FC<TradingControlsProps> = ({
   onApply,
   isLoading,
 }) => {
-  const [selectedPreset, setSelectedPreset] = useState<string>('latest');
-  const [customCutoffInput, setCustomCutoffInput] = useState<string>(decisionCutoff || '');
+  const [customCutoffInput, setCustomCutoffInput] = useState<string>(decisionCutoff || '2025-12-31T11:30:00Z');
 
-  const handlePresetSelect = (presetId: string) => {
-    setSelectedPreset(presetId);
-    if (presetId === 'latest') {
+  // Map internal state to preset dropdown key
+  let currentPresetKey = 'rolling_da_1100';
+  if (cutoffType === 'latest') {
+    currentPresetKey = 'latest';
+  } else if (cutoffType === 'snapshot') {
+    currentPresetKey = 'snapshot';
+  } else if (cutoffType === 'rolling_da') {
+    currentPresetKey = daCutoffTime === '17:00' ? 'rolling_da_1700' : 'rolling_da_1100';
+  }
+
+  const handlePresetSelect = (presetKey: string) => {
+    if (presetKey === 'rolling_da_1100') {
+      onCutoffTypeChange('rolling_da');
+      onDaCutoffTimeChange('11:00');
       onCutoffChange(null);
-    } else if (presetId === 'da_1100') {
-      const d1 = new Date(dateFrom);
-      d1.setUTCDate(d1.getUTCDate() - 1);
-      const iso = `${d1.toISOString().split('T')[0]}T11:00:00Z`;
-      onCutoffChange(iso);
-      setCustomCutoffInput(iso);
-    } else if (presetId === 'da_1700') {
-      const d1 = new Date(dateFrom);
-      d1.setUTCDate(d1.getUTCDate() - 1);
-      const iso = `${d1.toISOString().split('T')[0]}T17:00:00Z`;
-      onCutoffChange(iso);
-      setCustomCutoffInput(iso);
-    } else if (presetId === 'custom') {
-      if (customCutoffInput) {
-        onCutoffChange(customCutoffInput);
-      }
+    } else if (presetKey === 'rolling_da_1700') {
+      onCutoffTypeChange('rolling_da');
+      onDaCutoffTimeChange('17:00');
+      onCutoffChange(null);
+    } else if (presetKey === 'latest') {
+      onCutoffTypeChange('latest');
+      onCutoffChange(null);
+    } else if (presetKey === 'snapshot') {
+      onCutoffTypeChange('snapshot');
+      onCutoffChange(customCutoffInput);
     }
   };
 
   const handleCustomCutoffSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (customCutoffInput) {
+      onCutoffTypeChange('snapshot');
       onCutoffChange(customCutoffInput);
-      setSelectedPreset('custom');
     }
   };
 
@@ -72,7 +84,7 @@ export const TradingControls: React.FC<TradingControlsProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-muted)' }}>
             <Calendar size={15} color="var(--wind-cyan)" />
             <span style={{ fontSize: '0.78rem', fontWeight: 600, textTransform: 'uppercase' }}>
-              Evaluation Period:
+              Delivery Range:
             </span>
           </div>
 
@@ -99,9 +111,9 @@ export const TradingControls: React.FC<TradingControlsProps> = ({
             <button
               className="btn"
               style={{ fontSize: '0.72rem', padding: '0.3rem 0.5rem' }}
-              onClick={() => onDateChange('2026-01-01', '2026-01-07')}
+              onClick={() => onDateChange('2026-01-01', '2026-01-05')}
             >
-              Jan 1–7
+              Jan 1–5 (Benchmark)
             </button>
             <button
               className="btn"
@@ -115,7 +127,7 @@ export const TradingControls: React.FC<TradingControlsProps> = ({
               style={{ fontSize: '0.72rem', padding: '0.3rem 0.5rem' }}
               onClick={() => onDateChange('2026-01-01', '2026-01-31')}
             >
-              Jan Full Month
+              Full Month (Jan)
             </button>
           </div>
         </div>
@@ -131,21 +143,21 @@ export const TradingControls: React.FC<TradingControlsProps> = ({
 
           <select
             className="select-field"
-            value={selectedPreset}
+            value={currentPresetKey}
             onChange={(e) => handlePresetSelect(e.target.value)}
-            style={{ fontSize: '0.78rem' }}
+            style={{ fontSize: '0.78rem', maxWidth: '300px' }}
           >
-            <option value="latest">Latest Published (No Cutoff)</option>
-            <option value="da_1100">Day-Ahead 11:00 UTC (EPEX Gate)</option>
-            <option value="da_1700">Day-Ahead 17:00 UTC (NESO Schedule)</option>
-            <option value="custom">Custom Point-in-Time...</option>
+            <option value="rolling_da_1100">Day-Ahead Operational (D-1 11:00 London)</option>
+            <option value="rolling_da_1700">Day-Ahead Schedule (D-1 17:00 London)</option>
+            <option value="latest">Retrospective Benchmark (Latest before Delivery)</option>
+            <option value="snapshot">Point-in-Time Snapshot (Single Timestamp)</option>
           </select>
 
-          {selectedPreset === 'custom' && (
+          {cutoffType === 'snapshot' && (
             <form onSubmit={handleCustomCutoffSubmit} style={{ display: 'flex', gap: '0.4rem' }}>
               <input
                 type="text"
-                placeholder="2025-12-31T12:00:00Z"
+                placeholder="2025-12-31T11:30:00Z"
                 className="input-field tabular"
                 value={customCutoffInput}
                 onChange={(e) => setCustomCutoffInput(e.target.value)}
@@ -157,9 +169,19 @@ export const TradingControls: React.FC<TradingControlsProps> = ({
             </form>
           )}
 
-          {decisionCutoff && (
-            <span className="badge badge-amber" title={`Enforcing strict cutoff <= ${decisionCutoff}`}>
-              Cutoff Active
+          {cutoffType === 'rolling_da' && (
+            <span className="badge badge-amber" title={`Evaluating forecasts published prior to D-1 ${daCutoffTime} London local time`}>
+              Rolling DA ({daCutoffTime} London)
+            </span>
+          )}
+          {cutoffType === 'snapshot' && decisionCutoff && (
+            <span className="badge badge-amber" title={`Strict point-in-time barrier: <= ${decisionCutoff}`}>
+              Snapshot: {decisionCutoff.slice(0, 16)}Z
+            </span>
+          )}
+          {cutoffType === 'latest' && (
+            <span className="badge badge-cyan" title="Latest forecast published at or before delivery start (ex-post excluded)">
+              Latest Ex-Ante
             </span>
           )}
         </div>
@@ -174,22 +196,8 @@ export const TradingControls: React.FC<TradingControlsProps> = ({
             border: '1px solid var(--border-subtle)',
           }}>
             <button
-              onClick={() => onGranularityChange('half_hourly')}
-              style={{
-                padding: '0.3rem 0.6rem',
-                fontSize: '0.72rem',
-                fontWeight: 600,
-                background: granularity === 'half_hourly' ? 'rgba(56, 189, 248, 0.2)' : 'transparent',
-                color: granularity === 'half_hourly' ? 'var(--wind-cyan)' : 'var(--text-muted)',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-              }}
-            >
-              Half-Hour (SP 1–48)
-            </button>
-            <button
               onClick={() => onGranularityChange('hourly')}
+              title="Native 1-to-1 comparison: averages FUELHH half-hours to match WINDFOR's native 1-hour resolution"
               style={{
                 padding: '0.3rem 0.6rem',
                 fontSize: '0.72rem',
@@ -201,7 +209,23 @@ export const TradingControls: React.FC<TradingControlsProps> = ({
                 cursor: 'pointer',
               }}
             >
-              Hourly Avg
+              Hourly (Native 1-to-1)
+            </button>
+            <button
+              onClick={() => onGranularityChange('half_hourly')}
+              title="Broadcast mode: duplicates hourly WINDFOR forecast across SP 2k-1 and SP 2k (evaluates intra-hour ramp)"
+              style={{
+                padding: '0.3rem 0.6rem',
+                fontSize: '0.72rem',
+                fontWeight: 600,
+                background: granularity === 'half_hourly' ? 'rgba(56, 189, 248, 0.2)' : 'transparent',
+                color: granularity === 'half_hourly' ? 'var(--wind-cyan)' : 'var(--text-muted)',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}
+            >
+              Half-Hour (Broadcast)
             </button>
           </div>
 
@@ -213,6 +237,23 @@ export const TradingControls: React.FC<TradingControlsProps> = ({
             {isLoading ? 'Calculating...' : 'Recalculate'}
           </button>
         </div>
+      </div>
+
+      {/* Sub-header trading clarification banner */}
+      <div style={{
+        marginTop: '0.75rem',
+        paddingTop: '0.6rem',
+        borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.5rem',
+        fontSize: '0.72rem',
+        color: 'var(--text-muted)',
+      }}>
+        <Info size={13} color="var(--wind-cyan)" />
+        <span>
+          <strong style={{ color: 'var(--text-secondary)' }}>GB Power Market Rule:</strong> EPEX SPOT / Nord Pool GB Day-Ahead order book closes at <strong>11:00 UK local time</strong> (11:00 GMT / 10:00 UTC in summer BST). Balancing Mechanism (BM) Gate Closure is 1 hour prior to each half-hour delivery.
+        </span>
       </div>
     </div>
   );

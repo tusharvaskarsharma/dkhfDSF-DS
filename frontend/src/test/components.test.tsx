@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MetricKpiCard } from '../components/MetricKpiCard';
@@ -129,6 +128,8 @@ describe('GranularDataTable Component', () => {
 describe('TradingControls Component', () => {
   it('triggers date and cutoff updates', () => {
     const onDateChange = vi.fn();
+    const onCutoffTypeChange = vi.fn();
+    const onDaCutoffTimeChange = vi.fn();
     const onCutoffChange = vi.fn();
     const onGranularityChange = vi.fn();
     const onApply = vi.fn();
@@ -138,19 +139,23 @@ describe('TradingControls Component', () => {
         dateFrom="2026-01-01"
         dateTo="2026-01-31"
         onDateChange={onDateChange}
+        cutoffType="rolling_da"
+        onCutoffTypeChange={onCutoffTypeChange}
+        daCutoffTime="11:00"
+        onDaCutoffTimeChange={onDaCutoffTimeChange}
         decisionCutoff={null}
         onCutoffChange={onCutoffChange}
-        granularity="half_hourly"
+        granularity="hourly"
         onGranularityChange={onGranularityChange}
         onApply={onApply}
         isLoading={false}
       />
     );
 
-    // Click quick preset Jan 1-7
-    const jan17Btn = screen.getByText('Jan 1–7');
-    fireEvent.click(jan17Btn);
-    expect(onDateChange).toHaveBeenCalledWith('2026-01-01', '2026-01-07');
+    // Click quick preset Jan 1-5 Benchmark
+    const jan15Btn = screen.getByText('Jan 1–5 (Benchmark)');
+    fireEvent.click(jan15Btn);
+    expect(onDateChange).toHaveBeenCalledWith('2026-01-01', '2026-01-05');
 
     // Click Recalculate
     const recalcBtn = screen.getByText('Recalculate');
@@ -161,9 +166,10 @@ describe('TradingControls Component', () => {
 
 describe('API URL Generator', () => {
   it('constructs correct CSV export URL parameters', () => {
-    const url = getExportCsvUrl('2026-01-01', '2026-01-15', '2025-12-31T11:00:00Z', 'hourly');
+    const url = getExportCsvUrl('2026-01-01', '2026-01-15', 'snapshot', '11:00', '2025-12-31T11:00:00Z', 'hourly');
     expect(url).toContain('date_from=2026-01-01');
     expect(url).toContain('date_to=2026-01-15');
+    expect(url).toContain('cutoff_type=snapshot');
     expect(url).toContain('decision_cutoff=2025-12-31T11%3A00%3A00Z');
     expect(url).toContain('granularity=hourly');
   });

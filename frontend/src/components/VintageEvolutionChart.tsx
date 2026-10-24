@@ -227,7 +227,11 @@ export const VintageEvolutionChart: React.FC<VintageEvolutionChartProps> = ({ ev
                     )}
                   </td>
                   <td>
-                    {v.is_eligible_before_cutoff ? (
+                    {v.is_ex_post ? (
+                      <span className="badge badge-rose" title="Published after delivery start: rejected by causality rule">
+                        Ex-Post (Post-Delivery)
+                      </span>
+                    ) : v.is_eligible_before_cutoff ? (
                       <span className="badge badge-emerald">Eligible (&le; Cutoff)</span>
                     ) : (
                       <span className="badge badge-rose">Post-Cutoff (Future Info)</span>

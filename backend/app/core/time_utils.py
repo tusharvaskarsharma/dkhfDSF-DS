@@ -53,6 +53,23 @@ def get_settlement_day_bounds_utc(settlement_date_str: str) -> Tuple[datetime, d
     
     return utc_start, utc_end
 
+def get_day_ahead_cutoff_utc(settlement_date_str: str, cutoff_time_str: str = "11:00") -> datetime:
+    """
+    Given a UK settlement date 'YYYY-MM-DD', calculate the Day-Ahead decision cutoff on D-1
+    at the specified London local time (default '11:00' UK local time).
+    Automatically converts to UTC, accounting for GMT (UTC+0) vs BST (UTC+1).
+    """
+    y, m, d = [int(p) for p in settlement_date_str.split("-")]
+    deliv_d = date(y, m, d)
+    d_minus_1 = deliv_d - timedelta(days=1)
+    
+    parts = cutoff_time_str.split(":")
+    hour = int(parts[0])
+    minute = int(parts[1]) if len(parts) > 1 else 0
+    
+    ldn_cutoff = datetime(d_minus_1.year, d_minus_1.month, d_minus_1.day, hour, minute, 0, tzinfo=LONDON_TZ)
+    return ldn_cutoff.astimezone(UTC_TZ)
+
 def get_settlement_period_count_for_date(settlement_date_str: str) -> int:
     """
     Returns the expected number of 30-minute settlement periods for a UK settlement date:

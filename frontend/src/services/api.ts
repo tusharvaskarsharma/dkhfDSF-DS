@@ -26,18 +26,22 @@ export async function fetchOptions(): Promise<OptionsResponse> {
 export async function fetchEvaluation(
   dateFrom: string,
   dateTo: string,
+  cutoffType: 'rolling_da' | 'snapshot' | 'latest' = 'rolling_da',
+  daCutoffTime: string = '11:00',
   decisionCutoff?: string | null,
-  granularity: 'half_hourly' | 'hourly' = 'half_hourly',
+  granularity: 'half_hourly' | 'hourly' = 'hourly',
   mode: 'auto' | 'live' | 'demo' = 'auto'
 ): Promise<EvaluationResponse> {
   const params = new URLSearchParams({
     date_from: dateFrom,
     date_to: dateTo,
+    cutoff_type: cutoffType,
+    da_cutoff_time: daCutoffTime,
     granularity,
     mode,
   });
 
-  if (decisionCutoff) {
+  if (decisionCutoff && cutoffType === 'snapshot') {
     params.append('decision_cutoff', decisionCutoff);
   }
 
@@ -70,15 +74,19 @@ export async function fetchVintages(
 export function getExportCsvUrl(
   dateFrom: string,
   dateTo: string,
+  cutoffType: 'rolling_da' | 'snapshot' | 'latest' = 'rolling_da',
+  daCutoffTime: string = '11:00',
   decisionCutoff?: string | null,
-  granularity: 'half_hourly' | 'hourly' = 'half_hourly'
+  granularity: 'half_hourly' | 'hourly' = 'hourly'
 ): string {
   const params = new URLSearchParams({
     date_from: dateFrom,
     date_to: dateTo,
+    cutoff_type: cutoffType,
+    da_cutoff_time: daCutoffTime,
     granularity,
   });
-  if (decisionCutoff) {
+  if (decisionCutoff && cutoffType === 'snapshot') {
     params.append('decision_cutoff', decisionCutoff);
   }
   return `${API_BASE}/export?${params.toString()}`;

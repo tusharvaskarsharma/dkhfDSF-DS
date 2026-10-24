@@ -13,8 +13,10 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ScreenTab>('overview');
   const [dateFrom, setDateFrom] = useState<string>('2026-01-01');
   const [dateTo, setDateTo] = useState<string>('2026-01-31');
+  const [cutoffType, setCutoffType] = useState<'rolling_da' | 'snapshot' | 'latest'>('rolling_da');
+  const [daCutoffTime, setDaCutoffTime] = useState<string>('11:00');
   const [decisionCutoff, setDecisionCutoff] = useState<string | null>(null);
-  const [granularity, setGranularity] = useState<'half_hourly' | 'hourly'>('half_hourly');
+  const [granularity, setGranularity] = useState<'half_hourly' | 'hourly'>('hourly');
   const [mode, setMode] = useState<'auto' | 'live' | 'demo'>('auto');
 
   const [selectedDeliveryTime, setSelectedDeliveryTime] = useState<string>('');
@@ -34,7 +36,7 @@ export const App: React.FC = () => {
   const loadData = useCallback(() => {
     setLoading(true);
     setError(null);
-    fetchEvaluation(dateFrom, dateTo, decisionCutoff, granularity, mode)
+    fetchEvaluation(dateFrom, dateTo, cutoffType, daCutoffTime, decisionCutoff, granularity, mode)
       .then((data) => {
         setEvaluation(data);
         if (data.intervals.length > 0 && !selectedDeliveryTime) {
@@ -46,7 +48,7 @@ export const App: React.FC = () => {
         setError(err.message || 'Failed to fetch evaluation');
         setLoading(false);
       });
-  }, [dateFrom, dateTo, decisionCutoff, granularity, mode, selectedDeliveryTime]);
+  }, [dateFrom, dateTo, cutoffType, daCutoffTime, decisionCutoff, granularity, mode, selectedDeliveryTime]);
 
   useEffect(() => {
     loadHealth();
@@ -59,7 +61,7 @@ export const App: React.FC = () => {
   }, [loadData]);
 
   const handleExportCsv = () => {
-    const url = getExportCsvUrl(dateFrom, dateTo, decisionCutoff, granularity);
+    const url = getExportCsvUrl(dateFrom, dateTo, cutoffType, daCutoffTime, decisionCutoff, granularity);
     window.open(url, '_blank');
   };
 
@@ -103,6 +105,10 @@ export const App: React.FC = () => {
             setDateFrom(from);
             setDateTo(to);
           }}
+          cutoffType={cutoffType}
+          onCutoffTypeChange={setCutoffType}
+          daCutoffTime={daCutoffTime}
+          onDaCutoffTimeChange={setDaCutoffTime}
           decisionCutoff={decisionCutoff}
           onCutoffChange={setDecisionCutoff}
           granularity={granularity}

@@ -89,7 +89,7 @@ export const Header: React.FC<HeaderProps> = ({
             boxShadow: `0 0 8px ${isConnected ? '#10B981' : '#F43F5E'}`,
           }} />
           <span style={{ color: isConnected ? '#34D399' : '#FB7185', fontWeight: 600 }}>
-            {isConnected ? `LIVE API (${health?.elexon_latency_ms ?? 0}ms)` : 'API DEGRADED'}
+            {isConnected ? `Elexon BMRS: Online (${health?.elexon_latency_ms ?? 0}ms)` : 'Elexon BMRS: Degraded'}
           </span>
         </div>
 

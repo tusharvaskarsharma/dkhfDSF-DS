@@ -71,3 +71,62 @@ def test_build_vintage_evolution():
     assert evo["vintages"][1]["is_selected"] is True
     assert evo["vintages"][2]["is_eligible_before_cutoff"] is False
     assert evo["vintages"][2]["is_selected"] is False
+
+def test_prevent_ex_post_look_ahead_leakage():
+    """Prove that vintages published after delivery time are NEVER selected, even with no cutoff."""
+    delivery = "2026-01-02T12:00:00Z"
+    vintages = [
+        {"id": 1, "delivery_time": delivery, "publish_time": "2026-01-02T06:00:00Z", "generation_mw": 12000.0},
+        {"id": 2, "delivery_time": delivery, "publish_time": "2026-01-02T11:00:00Z", "generation_mw": 12500.0},
+        # Ex-post revision published AFTER interval started:
+        {"id": 3, "delivery_time": delivery, "publish_time": "2026-01-02T14:00:00Z", "generation_mw": 13800.0},
+        {"id": 4, "delivery_time": delivery, "publish_time": "2026-01-03T02:00:00Z", "generation_mw": 13900.0},
+    ]
+
+    # Without decision cutoff, it must select id=2 (11:00Z), NOT id=3 or id=4
+    sel = select_forecast_for_delivery(vintages, decision_cutoff=None, delivery_time=delivery)
+    assert sel is not None
+    assert sel["id"] == 2
+    assert sel["generation_mw"] == 12500.0
+    assert sel["publish_time"] == "2026-01-02T11:00:00Z"
+    assert sel["lead_time_hours"] == 1.0
+
+def test_rolling_day_ahead_multi_day_evaluation():
+    """Verify that in rolling_da mode, each delivery day uses its specific D-1 11:00 London cutoff."""
+    fc_records = [
+        # For Jan 1 delivery: published Dec 30 (eligible), Dec 31 10:00 (eligible), Dec 31 14:00 (too late for DA)
+        {"id": 101, "delivery_time": "2026-01-01T15:00:00Z", "publish_time": "2025-12-30T11:00:00Z", "generation_mw": 8000.0},
+        {"id": 102, "delivery_time": "2026-01-01T15:00:00Z", "publish_time": "2025-12-31T10:30:00Z", "generation_mw": 8500.0},
+        {"id": 103, "delivery_time": "2026-01-01T15:00:00Z", "publish_time": "2025-12-31T14:00:00Z", "generation_mw": 9000.0},
+
+        # For Jan 2 delivery: published Dec 31 10:30 (eligible), Jan 1 10:30 (eligible for Jan 2!), Jan 1 15:00 (too late for Jan 2)
+        {"id": 201, "delivery_time": "2026-01-02T15:00:00Z", "publish_time": "2025-12-31T10:30:00Z", "generation_mw": 10000.0},
+        {"id": 202, "delivery_time": "2026-01-02T15:00:00Z", "publish_time": "2026-01-01T10:30:00Z", "generation_mw": 11000.0},
+        {"id": 203, "delivery_time": "2026-01-02T15:00:00Z", "publish_time": "2026-01-01T15:00:00Z", "generation_mw": 12000.0},
+    ]
+
+    sel_map = select_forecasts_for_delivery_intervals(
+        fc_records,
+        cutoff_type="rolling_da",
+        da_cutoff_time="11:00"
+    )
+
+    # Jan 1 must pick 102 (published Dec 31 10:30Z <= Dec 31 11:00Z)
+    assert "2026-01-01T15:00:00Z" in sel_map
+    assert sel_map["2026-01-01T15:00:00Z"]["id"] == 102
+    assert sel_map["2026-01-01T15:00:00Z"]["generation_mw"] == 8500.0
+
+    # Jan 2 must pick 202 (published Jan 1 10:30Z <= Jan 1 11:00Z)
+    assert "2026-01-02T15:00:00Z" in sel_map
+    assert sel_map["2026-01-02T15:00:00Z"]["id"] == 202
+    assert sel_map["2026-01-02T15:00:00Z"]["generation_mw"] == 11000.0
+
+def test_bst_daylight_saving_cutoff():
+    """Verify that during British Summer Time (BST), 11:00 London time evaluates to 10:00 UTC."""
+    from app.core.time_utils import get_day_ahead_cutoff_utc, format_utc_iso
+    # Summer date in July (BST is UTC+1)
+    cutoff_utc = get_day_ahead_cutoff_utc("2026-07-15", cutoff_time_str="11:00")
+    utc_str = format_utc_iso(cutoff_utc)
+    # D-1 is 2026-07-14; 11:00 BST is 10:00 UTC
+    assert utc_str == "2026-07-14T10:00:00Z"
+

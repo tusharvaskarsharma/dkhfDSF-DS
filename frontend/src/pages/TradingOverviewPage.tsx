@@ -89,18 +89,24 @@ export const TradingOverviewPage: React.FC<TradingOverviewPageProps> = ({
             </span>
             <Clock size={15} color="var(--cutoff-amber)" />
           </div>
-          <div style={{ fontSize: '1.15rem', fontWeight: 700, color: '#F8FAFC', margin: '0.25rem 0' }}>
-            {decision_cutoff ? (
-              <span className="tabular">{decision_cutoff}</span>
-            ) : (
-              'Latest Available (Dynamic)'
+          <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#F8FAFC', margin: '0.25rem 0' }}>
+            {evaluation.cutoff_type === 'rolling_da' && (
+              <span>Rolling Day-Ahead (D-1 {evaluation.da_cutoff_time} London)</span>
+            )}
+            {evaluation.cutoff_type === 'snapshot' && (
+              <span className="tabular">{evaluation.decision_cutoff}</span>
+            )}
+            {evaluation.cutoff_type === 'latest' && (
+              <span>Retrospective Benchmark (Pre-Delivery)</span>
             )}
           </div>
           <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-            {decision_cutoff ? 'Strict point-in-time gate closure active' : 'No vintage cutoff applied; using latest pre-delivery runs'}
+            {evaluation.cutoff_type === 'rolling_da' && 'Evaluates forecast available at Day-Ahead auction deadline for each delivery day'}
+            {evaluation.cutoff_type === 'snapshot' && 'Strict point-in-time barrier: only data published prior to cutoff timestamp'}
+            {evaluation.cutoff_type === 'latest' && 'Final published forecast before interval delivery start (ex-post runs excluded)'}
           </div>
           <div style={{ fontSize: '0.68rem', color: 'var(--text-faint)', marginTop: '0.2rem' }}>
-            Look-Ahead Protection: Guaranteed Zero Future Leakage
+            Alignment: {evaluation.granularity === 'hourly' ? 'Hourly Native (1-to-1)' : 'Half-Hourly (Broadcast WINDFOR)'}
           </div>
         </div>
       </div>

@@ -67,15 +67,30 @@ def get_options():
         default_date_from=settings.DEFAULT_DATE_FROM,
         default_date_to=settings.DEFAULT_DATE_TO,
         available_cutoff_presets=[
-            {"id": "latest", "label": "Latest Published (No Cutoff)", "description": "Select the latest publication vintage published before delivery."},
-            {"id": "da_1100", "label": "Day-Ahead 11:00 UTC", "description": "EPEX / Nord Pool Day-Ahead Auction Gate Closure (11:00 UTC D-1)."},
-            {"id": "da_1700", "label": "Day-Ahead 17:00 UTC", "description": "National Grid Indicative Day-Ahead Schedule (17:00 UTC D-1)."},
-            {"id": "da_2300", "label": "Day-Ahead 23:00 UTC", "description": "Midnight preceding delivery day (23:00 UTC D-1)."},
-            {"id": "custom", "label": "Custom Timestamp Cutoff", "description": "Strict point-in-time historical decision boundary."}
+            {
+                "id": "rolling_da",
+                "label": "Day-Ahead Operational (Rolling D-1 11:00 London Time)",
+                "description": "Standard GB Day-Ahead trading cutoff. For each delivery day D, evaluates the forecast published before 11:00 London Local Time on D-1 (EPEX SPOT / Nord Pool auction gate closure; 11:00 GMT in winter / 10:00 UTC during BST)."
+            },
+            {
+                "id": "rolling_da_1700",
+                "label": "Day-Ahead Schedule (Rolling D-1 17:00 London Time)",
+                "description": "National Grid ESO Indicative Day-Ahead schedule publication boundary (17:00 London Local Time on D-1)."
+            },
+            {
+                "id": "latest",
+                "label": "Retrospective Benchmark (Latest before Delivery)",
+                "description": "Evaluates the latest available forecast published prior to interval delivery start (strictly publish_time <= delivery_time; ex-post runs excluded)."
+            },
+            {
+                "id": "snapshot",
+                "label": "Historical Point-in-Time Snapshot",
+                "description": "Strict point-in-time barrier. Evaluates only what had been published at or before a single fixed historical instant."
+            }
         ],
         datasets=[
-            {"id": "FUELHH", "name": "Half-Hourly Generation by Fuel Type (Actuals)", "fuelType": "WIND"},
-            {"id": "WINDFOR", "name": "Wind Generation Forecast (Multi-Vintage)", "resolution": "Hourly average MW"}
+            {"id": "FUELHH", "name": "Half-Hourly Generation by Fuel Type (Actuals)", "fuelType": "WIND", "resolution": "Half-hourly (SP 1-48, average MW)"},
+            {"id": "WINDFOR", "name": "Wind Generation Forecast (Multi-Vintage)", "resolution": "Hourly average MW (broadcast to SP 2k-1/2k in HH mode)"}
         ]
     )
 
@@ -102,8 +117,10 @@ def get_actuals(
 async def evaluate_forecasts(
     date_from: str = Query(settings.DEFAULT_DATE_FROM, description="Start date YYYY-MM-DD"),
     date_to: str = Query(settings.DEFAULT_DATE_TO, description="End date YYYY-MM-DD"),
-    decision_cutoff: Optional[str] = Query(None, description="Decision cutoff timestamp (ISO UTC)"),
-    granularity: str = Query("half_hourly", pattern="^(half_hourly|hourly)$"),
+    cutoff_type: str = Query("rolling_da", pattern="^(rolling_da|snapshot|latest)$", description="Cutoff selection rule"),
+    da_cutoff_time: str = Query("11:00", description="Day-Ahead cutoff time in London local time (HH:MM)"),
+    decision_cutoff: Optional[str] = Query(None, description="Static decision cutoff timestamp in ISO UTC (used when cutoff_type='snapshot')"),
+    granularity: str = Query("hourly", pattern="^(hourly|half_hourly)$", description="Evaluation time resolution"),
     mode: str = Query("auto", description="'auto', 'live', or 'demo'")
 ):
     """
@@ -148,7 +165,12 @@ async def evaluate_forecasts(
     raw_forecasts = get_forecast_records(delivery_from=d_start_iso, delivery_to=d_end_iso)
 
     # Apply Decision Cutoff & Vintage Selection
-    selected_forecasts_by_hour = select_forecasts_for_delivery_intervals(raw_forecasts, decision_cutoff)
+    selected_forecasts_by_hour = select_forecasts_for_delivery_intervals(
+        raw_forecasts,
+        cutoff_type=cutoff_type,
+        decision_cutoff=decision_cutoff,
+        da_cutoff_time=da_cutoff_time
+    )
 
     # Generate Expected Intervals (handling DST properly)
     expected_intervals = generate_expected_intervals_in_range(date_from, date_to)
@@ -166,6 +188,19 @@ async def evaluate_forecasts(
     metrics = calculate_accuracy_metrics(aligned, exp_count)
     daily = calculate_daily_breakdown(aligned)
 
+    alignment_method = "native_hourly" if granularity == "hourly" else "half_hourly_broadcast"
+    if granularity == "half_hourly":
+        quality_flags.append("HALF_HOURLY_BROADCAST: WINDFOR is natively hourly (average MW). Hourly forecasts are duplicated across SP 2k-1 and SP 2k. Intra-hour ramp variations are incorporated into error metrics.")
+    else:
+        quality_flags.append("NATIVE_HOURLY: Actual FUELHH periods are averaged ((SP_2k-1 + SP_2k)/2) to match WINDFOR's native 1-hour resolution without observation duplication.")
+
+    if cutoff_type == "rolling_da":
+        quality_flags.append(f"DAY_AHEAD_OPERATIONAL: For each delivery day D, evaluated against forecast published prior to D-1 {da_cutoff_time} London local time (GB Day-Ahead Auction cutoff).")
+    elif cutoff_type == "snapshot":
+        quality_flags.append(f"POINT_IN_TIME_SNAPSHOT: Single cutoff applied at {decision_cutoff}. Later intervals without published vintages prior to this instant are marked MISSING_FORECAST.")
+    else:
+        quality_flags.append("RETROSPECTIVE_BENCHMARK: Evaluated against latest available forecast published prior to delivery start (strictly publish_time <= delivery_time; ex-post runs excluded).")
+
     if metrics.coverage_pct < 80.0:
         quality_flags.append(f"LOW_COVERAGE_WARNING: Paired coverage is {metrics.coverage_pct}% (below 80%).")
     if metrics.missing_forecast_count > 0:
@@ -176,8 +211,11 @@ async def evaluate_forecasts(
     return EvaluationResponse(
         date_from=date_from,
         date_to=date_to,
+        cutoff_type=cutoff_type,
+        da_cutoff_time=da_cutoff_time,
         decision_cutoff=decision_cutoff,
         granularity=granularity,
+        alignment_method=alignment_method,
         metrics=metrics,
         intervals=aligned,
         daily_breakdown=daily,
@@ -213,14 +251,18 @@ def get_vintages(
 async def export_csv(
     date_from: str = Query(settings.DEFAULT_DATE_FROM),
     date_to: str = Query(settings.DEFAULT_DATE_TO),
+    cutoff_type: str = Query("rolling_da", pattern="^(rolling_da|snapshot|latest)$"),
+    da_cutoff_time: str = Query("11:00"),
     decision_cutoff: Optional[str] = Query(None),
-    granularity: str = Query("half_hourly", pattern="^(half_hourly|hourly)$")
+    granularity: str = Query("hourly", pattern="^(hourly|half_hourly)$")
 ):
     """Export evaluated intervals to CSV with identical methodology to the dashboard."""
     # Run the exact same evaluation pipeline
     eval_resp = await evaluate_forecasts(
         date_from=date_from,
         date_to=date_to,
+        cutoff_type=cutoff_type,
+        da_cutoff_time=da_cutoff_time,
         decision_cutoff=decision_cutoff,
         granularity=granularity,
         mode="auto"
