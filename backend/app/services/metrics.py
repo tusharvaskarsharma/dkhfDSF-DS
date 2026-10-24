@@ -4,7 +4,8 @@ from app.models.schemas import AccuracyMetrics, DailyMetric
 
 def calculate_accuracy_metrics(
     aligned_intervals: List[Dict[str, Any]],
-    expected_count: int
+    expected_count: int,
+    granularity: str = "hourly"
 ) -> AccuracyMetrics:
     """
     Calculate forecast accuracy metrics strictly from valid paired intervals:
@@ -45,10 +46,8 @@ def calculate_accuracy_metrics(
     sum_sq_errors = sum((it["actual_mw"] - it["forecast_mw"]) ** 2 for it in valid_pairs)
     sum_actuals = sum(abs(it["actual_mw"]) for it in valid_pairs)
     
-    # Generation totals in MWh (each half-hour interval represents 0.5 hours of power)
-    # If intervals are 1-hour, 1.0 hour. We can check time delta between intervals.
-    is_hourly = len(aligned_intervals) > 1 and aligned_intervals[0]["delivery_time"][:13] != aligned_intervals[1]["delivery_time"][:13]
-    hour_factor = 1.0 if is_hourly else 0.5
+    # Energy volume: MWh = MW * interval_duration_hours (1.0h for hourly, 0.5h for half-hourly)
+    hour_factor = 1.0 if granularity == "hourly" else 0.5
 
     total_act_mwh = round(sum(it["actual_mw"] for it in valid_pairs) * hour_factor, 2)
     total_fc_mwh = round(sum(it["forecast_mw"] for it in valid_pairs) * hour_factor, 2)

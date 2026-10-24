@@ -58,3 +58,23 @@ def test_hourly_alignment_averaging():
     assert h1["actual_mw"] == 1100.0
     assert h1["forecast_mw"] == 1050.0
     assert h1["error_mw"] == 50.0
+
+def test_hourly_alignment_incomplete_half_hour():
+    """Verify that if one of the two half-hours is missing, hourly actual is None rather than halved."""
+    expected = generate_settlement_periods_for_date("2026-01-01")[:2]
+    # Only SP 1 has actual; SP 2 is missing
+    actuals = [
+        {"delivery_time": "2026-01-01T00:00:00Z", "generation_mw": 1000.0, "settlement_period": 1},
+    ]
+    forecasts = {
+        "2026-01-01T00:00:00Z": {"delivery_time": "2026-01-01T00:00:00Z", "generation_mw": 1050.0, "publish_time": "2025-12-31T11:30:00Z"},
+    }
+
+    aligned = align_forecast_and_actuals(expected, actuals, forecasts, granularity="hourly")
+    assert len(aligned) == 1
+    h1 = aligned[0]
+    assert h1["delivery_time"] == "2026-01-01T00:00:00Z"
+    assert h1["status"] == "MISSING_ACTUAL"
+    assert h1["actual_mw"] is None
+    assert h1["error_mw"] is None
+

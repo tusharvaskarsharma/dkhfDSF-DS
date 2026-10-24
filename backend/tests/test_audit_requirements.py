@@ -90,3 +90,76 @@ def test_missing_data_provenance_and_zero_actual():
     # Both actuals are 0.0 -> denominator is 0.0 -> WAPE is handled gracefully
     assert metrics.wape_pct is None
     assert "zero" in metrics.explanation["wape_note"].lower()
+
+def test_auction_venue_cutoff_conversions():
+    """Verify order-book cutoffs across verified venues during both GMT and BST."""
+    from app.core.time_utils import get_day_ahead_cutoff_utc, format_utc_iso
+
+    # 1. EPEX SPOT GB Day-Ahead 60 Auction (09:20 London time)
+    # Winter (GMT): D-1 09:20 London -> 09:20 UTC
+    dt_gmt_epex = get_day_ahead_cutoff_utc("2026-01-15", cutoff_time_str="09:20")
+    assert format_utc_iso(dt_gmt_epex) == "2026-01-14T09:20:00Z"
+    # Summer (BST): D-1 09:20 London -> 08:20 UTC
+    dt_bst_epex = get_day_ahead_cutoff_utc("2026-07-15", cutoff_time_str="09:20")
+    assert format_utc_iso(dt_bst_epex) == "2026-07-14T08:20:00Z"
+
+    # 2. Nord Pool / N2EX GB Day-Ahead Auction (09:50 London time)
+    # Winter (GMT): D-1 09:50 London -> 09:50 UTC
+    dt_gmt_nord = get_day_ahead_cutoff_utc("2026-01-15", cutoff_time_str="09:50")
+    assert format_utc_iso(dt_gmt_nord) == "2026-01-14T09:50:00Z"
+    # Summer (BST): D-1 09:50 London -> 08:50 UTC
+    dt_bst_nord = get_day_ahead_cutoff_utc("2026-07-15", cutoff_time_str="09:50")
+    assert format_utc_iso(dt_bst_nord) == "2026-07-14T08:50:00Z"
+
+    # 3. EPEX SPOT Half-Hour Auction (15:30 London time)
+    dt_gmt_half = get_day_ahead_cutoff_utc("2026-01-15", cutoff_time_str="15:30")
+    assert format_utc_iso(dt_gmt_half) == "2026-01-14T15:30:00Z"
+
+    # 4. NESO Indicative Day-Ahead Schedule (17:00 London time)
+    dt_gmt_neso = get_day_ahead_cutoff_utc("2026-01-15", cutoff_time_str="17:00")
+    assert format_utc_iso(dt_gmt_neso) == "2026-01-14T17:00:00Z"
+    dt_bst_neso = get_day_ahead_cutoff_utc("2026-07-15", cutoff_time_str="17:00")
+    assert format_utc_iso(dt_bst_neso) == "2026-07-14T16:00:00Z"
+
+def test_canonical_reproducibility_from_stored_db(monkeypatch):
+    """Verify that Jan 1-5 canonical benchmark evaluation is 100% reproducible from local data."""
+    import os
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.core.config import settings
+
+    candidate_paths = [
+        os.path.abspath('backend/data/wind_forecast.db'),
+        os.path.abspath('data/wind_forecast.db')
+    ]
+    db_path = next((p for p in candidate_paths if os.path.exists(p)), None)
+    if not db_path:
+        pytest.skip("Stored SQLite database not found, skipping local reproducibility check.")
+
+    monkeypatch.setattr(settings, "DATABASE_PATH", db_path)
+
+    client = TestClient(app)
+    # EPEX SPOT 09:20 London Cutoff
+    resp = client.get(
+        "/api/v1/evaluation",
+        params={
+            "date_from": "2026-01-01",
+            "date_to": "2026-01-05",
+            "granularity": "hourly",
+            "cutoff_type": "rolling_da",
+            "da_cutoff_time": "09:20",
+        }
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    m = data["metrics"]
+    assert m["valid_pairs_count"] == 120
+    assert m["expected_intervals_count"] == 120
+    assert m["coverage_pct"] == 100.0
+    assert m["mae_mw"] == 2429.28
+    assert m["bias_mw"] == -2090.60
+    assert m["rmse_mw"] == 3029.48
+    assert m["wape_pct"] == 17.70
+
+
+

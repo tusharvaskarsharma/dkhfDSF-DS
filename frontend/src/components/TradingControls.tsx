@@ -35,19 +35,36 @@ export const TradingControls: React.FC<TradingControlsProps> = ({
   const [customCutoffInput, setCustomCutoffInput] = useState<string>(decisionCutoff || '2025-12-31T11:30:00Z');
 
   // Map internal state to preset dropdown key
-  let currentPresetKey = 'rolling_da_1100';
+  let currentPresetKey = 'rolling_da_0920';
   if (cutoffType === 'latest') {
     currentPresetKey = 'latest';
   } else if (cutoffType === 'snapshot') {
     currentPresetKey = 'snapshot';
   } else if (cutoffType === 'rolling_da') {
-    currentPresetKey = daCutoffTime === '17:00' ? 'rolling_da_1700' : 'rolling_da_1100';
+    if (daCutoffTime === '09:20') currentPresetKey = 'rolling_da_0920';
+    else if (daCutoffTime === '09:50') currentPresetKey = 'rolling_da_0950';
+    else if (daCutoffTime === '11:00') currentPresetKey = 'rolling_da_1100';
+    else if (daCutoffTime === '15:30') currentPresetKey = 'rolling_da_1530';
+    else if (daCutoffTime === '17:00') currentPresetKey = 'rolling_da_1700';
+    else currentPresetKey = 'custom_da';
   }
 
   const handlePresetSelect = (presetKey: string) => {
-    if (presetKey === 'rolling_da_1100') {
+    if (presetKey === 'rolling_da_0920') {
+      onCutoffTypeChange('rolling_da');
+      onDaCutoffTimeChange('09:20');
+      onCutoffChange(null);
+    } else if (presetKey === 'rolling_da_0950') {
+      onCutoffTypeChange('rolling_da');
+      onDaCutoffTimeChange('09:50');
+      onCutoffChange(null);
+    } else if (presetKey === 'rolling_da_1100') {
       onCutoffTypeChange('rolling_da');
       onDaCutoffTimeChange('11:00');
+      onCutoffChange(null);
+    } else if (presetKey === 'rolling_da_1530') {
+      onCutoffTypeChange('rolling_da');
+      onDaCutoffTimeChange('15:30');
       onCutoffChange(null);
     } else if (presetKey === 'rolling_da_1700') {
       onCutoffTypeChange('rolling_da');
@@ -145,10 +162,13 @@ export const TradingControls: React.FC<TradingControlsProps> = ({
             className="select-field"
             value={currentPresetKey}
             onChange={(e) => handlePresetSelect(e.target.value)}
-            style={{ fontSize: '0.78rem', maxWidth: '300px' }}
+            style={{ fontSize: '0.78rem', maxWidth: '340px' }}
           >
-            <option value="rolling_da_1100">Day-Ahead Operational (D-1 11:00 London)</option>
-            <option value="rolling_da_1700">Day-Ahead Schedule (D-1 17:00 London)</option>
+            <option value="rolling_da_0920">EPEX SPOT GB DA 60 (D-1 09:20 London)</option>
+            <option value="rolling_da_0950">Nord Pool / N2EX GB DA (D-1 09:50 London)</option>
+            <option value="rolling_da_1100">Configurable Reference (D-1 11:00 London)</option>
+            <option value="rolling_da_1530">EPEX SPOT Half-Hour (D-1 15:30 London)</option>
+            <option value="rolling_da_1700">NESO Day-Ahead Schedule (D-1 17:00 London)</option>
             <option value="latest">Retrospective Benchmark (Latest before Delivery)</option>
             <option value="snapshot">Point-in-Time Snapshot (Single Timestamp)</option>
           </select>
@@ -252,7 +272,7 @@ export const TradingControls: React.FC<TradingControlsProps> = ({
       }}>
         <Info size={13} color="var(--wind-cyan)" />
         <span>
-          <strong style={{ color: 'var(--text-secondary)' }}>GB Power Market Rule:</strong> EPEX SPOT / Nord Pool GB Day-Ahead order book closes at <strong>11:00 UK local time</strong> (11:00 GMT / 10:00 UTC in summer BST). Balancing Mechanism (BM) Gate Closure is 1 hour prior to each half-hour delivery.
+          <strong style={{ color: 'var(--text-secondary)' }}>GB Power Market Deadlines:</strong> EPEX SPOT GB Day-Ahead 60 closes at <strong>09:20 UK local time</strong> (results ~09:30). Nord Pool / N2EX closes at <strong>09:50 UK local time</strong> (results at 10:00 UK / 11:00 CET). NESO schedule publishes at <strong>17:00 UK local time</strong>. Balancing Mechanism (BM) Gate Closure is <strong>1 hour prior</strong> to each half-hour delivery.
         </span>
       </div>
     </div>

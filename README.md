@@ -6,10 +6,17 @@ A production-grade analytics and decision-support terminal built for UK electric
 
 ## 1. Project Overview & Business Value
 
-In the Great Britain (GB) electricity market, day-ahead power contracts clear at fixed auction gate closures (e.g., EPEX SPOT and Nord Pool at 11:00 UTC / 12:00 London time, D-1). Electricity traders must commit to purchase or sell volume before real-time delivery begins. Wind power is the primary source of volume volatility and price cannibalization in GB.
+In the Great Britain (GB) electricity market, day-ahead power contracts clear at venue-specific auction order-book closures on $D-1$:
+- **EPEX SPOT GB Day-Ahead 60 Auction:** **09:20 London Local Time** (primary benchmark for hourly physical power).
+- **Nord Pool / N2EX GB Day-Ahead Auction:** **09:50 London Local Time** (results at 10:00 London / 11:00 CET).
+- **EPEX SPOT GB Day-Ahead 30 Auction:** **15:30 London Local Time** (half-hourly power contracts).
+- **NESO Day-Ahead Schedule:** **17:00 London Local Time** (National Grid indicative generation forecast).
+- **Balancing Mechanism Gate Closure:** **1 hour prior** to each half-hour delivery interval.
+
+Electricity traders must commit to purchase or sell volume before real-time delivery begins. Wind power is the primary source of volume volatility and price cannibalization in GB.
 
 This dashboard answers core trading questions:
-1. **Latest Eligible Forecast:** What was the most recently published wind forecast prior to a selected decision cutoff (e.g., Day-Ahead Auction Gate Closure)?
+1. **Latest Eligible Forecast:** What was the most recently published wind forecast prior to a selected decision cutoff (e.g., EPEX SPOT 09:20 or Nord Pool 09:50 auction closure)?
 2. **Convergence & Evolution:** How did the wind forecast evolve across historical publication runs as delivery approached?
 3. **Accuracy & Directional Bias:** Did the forecast consistently underpredict (system short, positive bias) or overpredict (system long, negative bias) actual wind generation?
 4. **Tail Risk:** How extreme were the forecast misses (measured by Root Mean Squared Error, RMSE)?
@@ -21,7 +28,7 @@ This dashboard answers core trading questions:
 
 ## 2. Key Features
 
-- **Strict Historical Decision-Cutoff Engine:** Evaluates forecasts at point-in-time boundaries (e.g., Day-Ahead 11:00 UTC, 17:00 UTC, or custom UTC timestamps). Completely eliminates look-ahead bias and future data leakage.
+- **Strict Historical Decision-Cutoff Engine:** Evaluates forecasts at point-in-time boundaries using rolling day-ahead venue cutoffs (09:20 EPEX, 09:50 Nord Pool, 15:30 EPEX HH, 17:00 NESO), retrospective pre-delivery timestamps, or historical snapshots. Completely eliminates look-ahead bias and future data leakage.
 - **Publication Vintage Audit:** For every half-hourly or hourly delivery interval, tracks all revision runs published by National Grid / NESO, with exact publication timestamps, lead times, and eligibility markers.
 - **UK Market Settlement Alignment:** Aligns half-hourly `FUELHH` metered generation (Settlement Periods 1–48) with hourly `WINDFOR` forecasts, supporting both half-hourly settlement intervals and hourly aggregations.
 - **Daylight-Saving Time Precision:** Handles clock-change transitions mathematically using Python `zoneinfo` (`Europe/London`):
@@ -277,13 +284,14 @@ The frontend will be available at `http://localhost:3000` (or `http://localhost:
 ---
 
 ## 11. Automated Testing Suite
-
+ 
 ### Backend Test Coverage (`pytest tests -v`)
-All 22 unit and integration tests pass:
+All 33 unit and regression tests pass:
+- `test_audit_requirements.py`: 6-day API query chunking limits, duplicate upsert idempotency, 46/48/50 settlement period DST handling, zero-actual WAPE handling, auction cutoff timezone conversions across GMT/BST, and canonical benchmark reproducibility from stored data.
+- `test_alignment.py`: Half-hourly broadcast alignment, hourly averaging ($(A_1 + A_2)/2$), and dropping incomplete hours when one half-hour is missing.
+- `test_vintage_selector.py`: Decision-cutoff enforcement, prevention of look-ahead leakage, deterministic tie-breaking, evolution audit, rolling DA multi-day evaluation, and BST daylight saving cutoff calculation.
+- `test_metrics.py`: Hand-verified calculations of MAE, RMSE, Bias, WAPE, zero-denominator handling, missing values, daily breakdown, and duration-weighted energy volume (MWh).
 - `test_time_utils.py`: UTC conversions, London GMT/BST display, standard and DST settlement period generation (46, 48, 50 periods).
-- `test_vintage_selector.py`: Decision-cutoff enforcement, prevention of look-ahead leakage, deterministic tie-breaking, evolution audit.
-- `test_metrics.py`: Hand-verified calculations of MAE, RMSE, Bias, WAPE, zero-denominator handling, missing values, daily breakdown.
-- `test_alignment.py`: Half-hourly settlement period pairing and hourly aggregation averaging.
 - `test_database.py`: SQLite schema, deduplication on upsert, and cache statistics.
 - `test_api.py`: FastAPI test client verifying `/health`, `/config/options`, `/evaluation`, `/vintages`, and `/export`.
 
@@ -292,12 +300,30 @@ All 7 component tests pass using Vitest and Testing Library:
 - `MetricKpiCard.test.tsx`: Renders all cards with correct units; handles nulls gracefully.
 - `AlertBanner.test.tsx`: Renders quality warning banners; handles empty flags.
 - `GranularDataTable.test.tsx`: Displays intervals, status badges, and triggers audit callbacks.
-- `TradingControls.test.tsx`: Updates dates, triggers recalculation, and cutoff presets.
+- `TradingControls.test.tsx`: Updates dates, triggers recalculation, and cutoff presets (EPEX SPOT 09:20, Nord Pool 09:50, NESO 17:00, etc.).
 - `API.test.tsx`: Verifies CSV export URL parameter generation.
 
 ---
 
-## 12. Environment Variables
+## 12. Canonical Evaluation Benchmarks (January 1–5, 2026)
+
+Evaluated across the 5-day delivery window using verified stored records:
+
+| Evaluation Mode | Venue / Cutoff Rule | Alignment | Valid / Expected | Coverage | Bias (ME) | MAE | RMSE | WAPE |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Rolling Day-Ahead** | **EPEX SPOT GB 60 (D-1 09:20 London)** | Hourly Native | 120 / 120 | 100.0% | **-2,090.60 MW** | **2,429.28 MW** | **3,029.48 MW** | **17.70%** |
+| **Rolling Day-Ahead** | **EPEX SPOT GB 60 (D-1 09:20 London)** | Half-Hour Broadcast | 240 / 240 | 100.0% | **-2,090.60 MW** | **2,430.07 MW** | **3,033.86 MW** | **17.70%** |
+| **Rolling Day-Ahead** | **Nord Pool GB (D-1 09:50 London)** | Hourly Native | 120 / 120 | 100.0% | **-2,079.43 MW** | **2,346.83 MW** | **3,000.66 MW** | **17.10%** |
+| **Rolling Day-Ahead** | **Nord Pool GB (D-1 09:50 London)** | Half-Hour Broadcast | 240 / 240 | 100.0% | **-2,079.43 MW** | **2,349.11 MW** | **3,005.09 MW** | **17.11%** |
+| **Rolling Day-Ahead** | **NESO Schedule (D-1 17:00 London)** | Hourly Native | 120 / 120 | 100.0% | **-2,362.66 MW** | **2,461.78 MW** | **3,123.58 MW** | **17.93%** |
+| **Retrospective** | **Latest Pre-Delivery ($P \le T_{\text{del}}$)** | Hourly Native | 120 / 120 | 100.0% | **-1,534.86 MW** | **2,413.43 MW** | **3,096.52 MW** | **17.58%** |
+| **Fixed Snapshot** | **Dec 31, 2025, 11:30 UTC** | Hourly Native | 46 / 120 | 38.33% | **-486.54 MW** | **930.46 MW** | **1,175.20 MW** | **5.69%** |
+
+*Note on Error Convention:* $e = A - F$. Negative bias ($\approx -2,080$ MW) signifies that forecasted output exceeded actual generation on average (overforecasting). This evaluates forecast accuracy and does not imply trading profit or loss.
+
+---
+
+## 13. Environment Variables
 
 | Variable | Default Value | Description |
 | :--- | :--- | :--- |
@@ -311,7 +337,7 @@ All 7 component tests pass using Vitest and Testing Library:
 
 ---
 
-## 13. Deployment Considerations
+## 14. Deployment Considerations
 
 - **Persistent Storage:** SQLite requires persistent storage (e.g., Docker persistent volume, AWS EBS, or Fly.io volume). For serverless platforms (e.g. AWS Lambda, Vercel), SQLite will not persist across cold starts; a managed SQL database (PostgreSQL/TimescaleDB) or external object store should be configured.
 - **CORS:** FastAPI CORS middleware is preconfigured to accept requests from localhost and configurable production domains.
@@ -319,25 +345,26 @@ All 7 component tests pass using Vitest and Testing Library:
 
 ---
 
-## 14. Verification & Validation Summary
+## 15. Verification & Validation Summary
 
 | Requirement | Implementation Status | Verification Method |
 | :--- | :--- | :--- |
 | **Official Elexon API** | Verified live & integrated | Live API probe retrieved 240 FUELHH & 4,672 WINDFOR records |
 | **7-Day Query Limit** | Implemented with 6-day chunker | Tested against Elexon 400 error limit and chunked cleanly |
-| **Decision Cutoff Logic** | Implemented & tested | Unit tests pass; evaluated live data at 2025-12-31 12:00 UTC |
-| **Look-Ahead Prevention** | Implemented & verified | Post-cutoff records strictly excluded; no silent fallbacks |
+| **Decision Cutoff Logic** | Implemented & tested | Unit tests pass; evaluated live data across verified venues (09:20, 09:50, 17:00) |
+| **Look-Ahead Prevention** | Implemented & verified | Post-cutoff and post-delivery records strictly excluded; no silent fallbacks |
 | **DST Transitions** | Implemented (46/48/50 SPs) | Python `zoneinfo` verified for Spring/Autumn 2026 transitions |
 | **Accuracy Calculations**| MAE, RMSE, Bias, WAPE, Coverage | Hand-verified mathematical tests in `test_metrics.py` |
 | **4 Screens (A, B, C, D)**| Completed with Antigravity UI | Overview, Accuracy, Vintages History, Data Status |
 | **CSV Export** | Implemented & tested | GET `/api/v1/export` exports exact matching format |
-| **Automated Tests** | 22 Backend + 7 Frontend tests | `pytest` and `npm test` execute 100% green |
-| **Docker Compose** | Production Dockerfiles authored | Docker compose with healthchecks & persistent volume |
+| **Automated Tests** | 33 Backend + 7 Frontend tests | `pytest` and `npm test` execute 100% green |
+| **Docker Compose** | Production Dockerfiles authored | Docker compose with healthchecks & persistent volume (runtime unverified on host) |
 
 ---
 
-## 15. AI Tool & Skill Disclosure
+## 16. AI Tool & Skill Disclosure
 
 - **Design Guidance:** The interface architecture, color palette, glassmorphism surfaces, and typography were designed following the instructions of the `antigravity-design-expert` skill.
 - **Assisting Coding Agent:** Developed using the Antigravity advanced agentic coding environment with Python 3.13, Node 26, Vite, and FastAPI.
 - **Live Verification Note:** Real live data from the official Elexon BMRS API was successfully retrieved and validated during development. Docker execution was not tested directly inside the container because the local development host did not have the Docker daemon installed in PATH.
+

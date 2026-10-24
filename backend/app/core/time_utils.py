@@ -53,11 +53,12 @@ def get_settlement_day_bounds_utc(settlement_date_str: str) -> Tuple[datetime, d
     
     return utc_start, utc_end
 
-def get_day_ahead_cutoff_utc(settlement_date_str: str, cutoff_time_str: str = "11:00") -> datetime:
+def get_day_ahead_cutoff_utc(settlement_date_str: str, cutoff_time_str: str = "09:20") -> datetime:
     """
     Given a UK settlement date 'YYYY-MM-DD', calculate the Day-Ahead decision cutoff on D-1
-    at the specified London local time (default '11:00' UK local time).
-    Automatically converts to UTC, accounting for GMT (UTC+0) vs BST (UTC+1).
+    at the specified London local time (default '09:20' UK local time, aligning with EPEX SPOT
+    GB Day-Ahead 60 order book closure; alternative presets include '09:50' for Nord Pool / N2EX).
+    Automatically converts to UTC, accounting for Europe/London GMT (UTC+0) vs BST (UTC+1).
     """
     y, m, d = [int(p) for p in settlement_date_str.split("-")]
     deliv_d = date(y, m, d)

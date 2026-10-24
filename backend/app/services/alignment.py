@@ -124,13 +124,11 @@ def _align_hourly(
         act1 = actual_map.get(hh1_str)
         act2 = actual_map.get(hh2_str)
 
-        actual_vals = []
-        if act1:
-            actual_vals.append(float(act1["generation_mw"]))
-        if act2:
-            actual_vals.append(float(act2["generation_mw"]))
-
-        actual_mw = round(sum(actual_vals) / len(actual_vals), 2) if actual_vals else None
+        # Both equal-duration 30-minute settlement periods must be present to form a valid hourly average
+        if act1 is not None and act2 is not None:
+            actual_mw = round((float(act1["generation_mw"]) + float(act2["generation_mw"])) / 2.0, 2)
+        else:
+            actual_mw = None
         
         forecast_rec = selected_forecasts_by_hour.get(hour_utc_str)
         forecast_mw = float(forecast_rec["generation_mw"]) if forecast_rec else None

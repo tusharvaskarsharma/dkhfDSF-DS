@@ -141,7 +141,7 @@ describe('TradingControls Component', () => {
         onDateChange={onDateChange}
         cutoffType="rolling_da"
         onCutoffTypeChange={onCutoffTypeChange}
-        daCutoffTime="11:00"
+        daCutoffTime="09:20"
         onDaCutoffTimeChange={onDaCutoffTimeChange}
         decisionCutoff={null}
         onCutoffChange={onCutoffChange}
@@ -156,6 +156,11 @@ describe('TradingControls Component', () => {
     const jan15Btn = screen.getByText('Jan 1–5 (Benchmark)');
     fireEvent.click(jan15Btn);
     expect(onDateChange).toHaveBeenCalledWith('2026-01-01', '2026-01-05');
+
+    // Change preset select to Nord Pool 09:50
+    const select = screen.getByRole('combobox');
+    fireEvent.change(select, { target: { value: 'rolling_da_0950' } });
+    expect(onDaCutoffTimeChange).toHaveBeenCalledWith('09:50');
 
     // Click Recalculate
     const recalcBtn = screen.getByText('Recalculate');

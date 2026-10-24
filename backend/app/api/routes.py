@@ -68,19 +68,34 @@ def get_options():
         default_date_to=settings.DEFAULT_DATE_TO,
         available_cutoff_presets=[
             {
-                "id": "rolling_da",
-                "label": "Day-Ahead Operational (Rolling D-1 11:00 London Time)",
-                "description": "Standard GB Day-Ahead trading cutoff. For each delivery day D, evaluates the forecast published before 11:00 London Local Time on D-1 (EPEX SPOT / Nord Pool auction gate closure; 11:00 GMT in winter / 10:00 UTC during BST)."
+                "id": "rolling_da_0920",
+                "label": "EPEX SPOT GB Day-Ahead 60 (D-1 09:20 London)",
+                "description": "Primary GB 60-minute auction order book closure at 09:20 UK local time (results published from 09:30)."
+            },
+            {
+                "id": "rolling_da_0950",
+                "label": "Nord Pool / N2EX GB Day-Ahead (D-1 09:50 London)",
+                "description": "Nord Pool / N2EX GB Day-Ahead auction order book closure at 09:50 UK local time (results published by 10:00 UK time / 11:00 CET)."
+            },
+            {
+                "id": "rolling_da_1100",
+                "label": "Configurable Reference Cutoff (D-1 11:00 London)",
+                "description": "Standard historical reference assumption (11:00 UK local time). Selects the 09:30 National Grid forecast run."
+            },
+            {
+                "id": "rolling_da_1530",
+                "label": "EPEX SPOT GB Half-Hour Auction (D-1 15:30 London)",
+                "description": "GB Half-Hour Day-Ahead auction order book closure at 15:30 UK local time."
             },
             {
                 "id": "rolling_da_1700",
-                "label": "Day-Ahead Schedule (Rolling D-1 17:00 London Time)",
-                "description": "National Grid ESO Indicative Day-Ahead schedule publication boundary (17:00 London Local Time on D-1)."
+                "label": "NESO Indicative Day-Ahead Schedule (D-1 17:00 London)",
+                "description": "National Grid ESO Indicative Day-Ahead schedule publication boundary at 17:00 UK local time."
             },
             {
                 "id": "latest",
                 "label": "Retrospective Benchmark (Latest before Delivery)",
-                "description": "Evaluates the latest available forecast published prior to interval delivery start (strictly publish_time <= delivery_time; ex-post runs excluded)."
+                "description": "Evaluates the latest available forecast published prior to interval delivery start (strictly publish_time <= delivery_time; ex-post assimilation runs excluded)."
             },
             {
                 "id": "snapshot",
@@ -118,7 +133,7 @@ async def evaluate_forecasts(
     date_from: str = Query(settings.DEFAULT_DATE_FROM, description="Start date YYYY-MM-DD"),
     date_to: str = Query(settings.DEFAULT_DATE_TO, description="End date YYYY-MM-DD"),
     cutoff_type: str = Query("rolling_da", pattern="^(rolling_da|snapshot|latest)$", description="Cutoff selection rule"),
-    da_cutoff_time: str = Query("11:00", description="Day-Ahead cutoff time in London local time (HH:MM)"),
+    da_cutoff_time: str = Query("09:20", description="Day-Ahead cutoff time in London local time (HH:MM)"),
     decision_cutoff: Optional[str] = Query(None, description="Static decision cutoff timestamp in ISO UTC (used when cutoff_type='snapshot')"),
     granularity: str = Query("hourly", pattern="^(hourly|half_hourly)$", description="Evaluation time resolution"),
     mode: str = Query("auto", description="'auto', 'live', or 'demo'")
@@ -185,7 +200,7 @@ async def evaluate_forecasts(
 
     # Accuracy Metrics Calculation
     exp_count = len(expected_intervals) if granularity == "half_hourly" else (len(expected_intervals) // 2)
-    metrics = calculate_accuracy_metrics(aligned, exp_count)
+    metrics = calculate_accuracy_metrics(aligned, exp_count, granularity=granularity)
     daily = calculate_daily_breakdown(aligned)
 
     alignment_method = "native_hourly" if granularity == "hourly" else "half_hourly_broadcast"

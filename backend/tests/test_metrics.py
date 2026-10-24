@@ -69,3 +69,27 @@ def test_daily_breakdown():
     assert daily[0].mae_mw == 100.0
     assert daily[1].date == "2026-01-02"
     assert daily[1].mae_mw == 100.0
+
+def test_energy_volume_duration_weighting():
+    """Verify that MWh is calculated as MW * duration (1.0h for hourly, 0.5h for half-hourly)."""
+    aligned = [
+        {"status": "VALID", "actual_mw": 2000.0, "forecast_mw": 1500.0, "delivery_time": "2026-01-01T00:00:00Z", "settlement_date": "2026-01-01"},
+        {"status": "VALID", "actual_mw": 3000.0, "forecast_mw": 2500.0, "delivery_time": "2026-01-01T01:00:00Z", "settlement_date": "2026-01-01"},
+    ]
+    # Hourly mode: 2 hours * avg MW
+    # sum actual MW = 5000 -> 5000 MWh
+    # sum forecast MW = 4000 -> 4000 MWh
+    m_hourly = calculate_accuracy_metrics(aligned, expected_count=2, granularity="hourly")
+    assert m_hourly.total_actual_mwh == 5000.0
+    assert m_hourly.total_forecast_mwh == 4000.0
+    assert round(m_hourly.total_actual_mwh - m_hourly.total_forecast_mwh, 2) == 1000.0
+
+    # Half-hourly mode: 2 intervals of 0.5h each
+    # sum actual MW = 5000 * 0.5 = 2500 MWh
+    # sum forecast MW = 4000 * 0.5 = 2000 MWh
+    m_hh = calculate_accuracy_metrics(aligned, expected_count=2, granularity="half_hourly")
+    assert m_hh.total_actual_mwh == 2500.0
+    assert m_hh.total_forecast_mwh == 2000.0
+    assert round(m_hh.total_actual_mwh - m_hh.total_forecast_mwh, 2) == 500.0
+
+

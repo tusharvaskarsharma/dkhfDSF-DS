@@ -14,7 +14,7 @@ export const App: React.FC = () => {
   const [dateFrom, setDateFrom] = useState<string>('2026-01-01');
   const [dateTo, setDateTo] = useState<string>('2026-01-31');
   const [cutoffType, setCutoffType] = useState<'rolling_da' | 'snapshot' | 'latest'>('rolling_da');
-  const [daCutoffTime, setDaCutoffTime] = useState<string>('11:00');
+  const [daCutoffTime, setDaCutoffTime] = useState<string>('09:20');
   const [decisionCutoff, setDecisionCutoff] = useState<string | null>(null);
   const [granularity, setGranularity] = useState<'half_hourly' | 'hourly'>('hourly');
   const [mode, setMode] = useState<'auto' | 'live' | 'demo'>('auto');
