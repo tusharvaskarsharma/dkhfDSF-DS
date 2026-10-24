@@ -72,7 +72,7 @@ def select_forecasts_for_delivery_intervals(
     all_forecasts: List[Dict[str, Any]],
     cutoff_type: str = "rolling_da",
     decision_cutoff: Optional[str] = None,
-    da_cutoff_time: str = "11:00"
+    da_cutoff_time: str = "09:20"
 ) -> Dict[str, Dict[str, Any]]:
     """
     Group all forecast records by delivery_time, and apply vintage selection logic

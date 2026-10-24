@@ -286,10 +286,10 @@ The frontend will be available at `http://localhost:3000` (or `http://localhost:
 ## 11. Automated Testing Suite
  
 ### Backend Test Coverage (`pytest tests -v`)
-All 33 unit and regression tests pass:
-- `test_audit_requirements.py`: 6-day API query chunking limits, duplicate upsert idempotency, 46/48/50 settlement period DST handling, zero-actual WAPE handling, auction cutoff timezone conversions across GMT/BST, and canonical benchmark reproducibility from stored data.
+All 35 unit and regression tests pass:
+- `test_audit_requirements.py`: 6-day API query chunking limits, duplicate upsert idempotency, 46/48/50 settlement period DST handling, zero-actual WAPE handling, auction cutoff timezone conversions across GMT/BST, 5-mode canonical benchmark reproducibility, and metric formula falsifiability.
 - `test_alignment.py`: Half-hourly broadcast alignment, hourly averaging ($(A_1 + A_2)/2$), and dropping incomplete hours when one half-hour is missing.
-- `test_vintage_selector.py`: Decision-cutoff enforcement, prevention of look-ahead leakage, deterministic tie-breaking, evolution audit, rolling DA multi-day evaluation, and BST daylight saving cutoff calculation.
+- `test_vintage_selector.py`: Decision-cutoff enforcement, prevention of look-ahead leakage, deterministic tie-breaking, evolution audit, rolling DA multi-day evaluation, BST daylight saving cutoff calculation, and regression testing proving later hindcasts cannot replace eligible forecasts.
 - `test_metrics.py`: Hand-verified calculations of MAE, RMSE, Bias, WAPE, zero-denominator handling, missing values, daily breakdown, and duration-weighted energy volume (MWh).
 - `test_time_utils.py`: UTC conversions, London GMT/BST display, standard and DST settlement period generation (46, 48, 50 periods).
 - `test_database.py`: SQLite schema, deduplication on upsert, and cache statistics.

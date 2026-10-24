@@ -122,7 +122,7 @@ def test_auction_venue_cutoff_conversions():
     assert format_utc_iso(dt_bst_neso) == "2026-07-14T16:00:00Z"
 
 def test_canonical_reproducibility_from_stored_db(monkeypatch):
-    """Verify that Jan 1-5 canonical benchmark evaluation is 100% reproducible from local data."""
+    """Verify that Jan 1-5 canonical benchmark evaluation is 100% reproducible across all modes."""
     import os
     from fastapi.testclient import TestClient
     from app.main import app
@@ -137,29 +137,103 @@ def test_canonical_reproducibility_from_stored_db(monkeypatch):
         pytest.skip("Stored SQLite database not found, skipping local reproducibility check.")
 
     monkeypatch.setattr(settings, "DATABASE_PATH", db_path)
-
     client = TestClient(app)
-    # EPEX SPOT 09:20 London Cutoff
-    resp = client.get(
+
+    # Mode 1: EPEX SPOT GB Day-Ahead 60 (D-1 09:20 London) - Hourly Native
+    r_epex = client.get(
         "/api/v1/evaluation",
-        params={
-            "date_from": "2026-01-01",
-            "date_to": "2026-01-05",
-            "granularity": "hourly",
-            "cutoff_type": "rolling_da",
-            "da_cutoff_time": "09:20",
-        }
+        params={"date_from": "2026-01-01", "date_to": "2026-01-05", "granularity": "hourly", "cutoff_type": "rolling_da", "da_cutoff_time": "09:20"}
     )
-    assert resp.status_code == 200
-    data = resp.json()
-    m = data["metrics"]
-    assert m["valid_pairs_count"] == 120
-    assert m["expected_intervals_count"] == 120
-    assert m["coverage_pct"] == 100.0
-    assert m["mae_mw"] == 2429.28
-    assert m["bias_mw"] == -2090.60
-    assert m["rmse_mw"] == 3029.48
-    assert m["wape_pct"] == 17.70
+    assert r_epex.status_code == 200
+    m_epex = r_epex.json()["metrics"]
+    assert m_epex["valid_pairs_count"] == 120
+    assert m_epex["coverage_pct"] == 100.0
+    assert m_epex["mae_mw"] == 2429.28
+    assert m_epex["bias_mw"] == -2090.60
+    assert m_epex["rmse_mw"] == 3029.48
+    assert m_epex["wape_pct"] == 17.70
+
+    # Mode 2: Nord Pool / N2EX GB Day-Ahead (D-1 09:50 London) - Hourly Native
+    r_nord = client.get(
+        "/api/v1/evaluation",
+        params={"date_from": "2026-01-01", "date_to": "2026-01-05", "granularity": "hourly", "cutoff_type": "rolling_da", "da_cutoff_time": "09:50"}
+    )
+    assert r_nord.status_code == 200
+    m_nord = r_nord.json()["metrics"]
+    assert m_nord["valid_pairs_count"] == 120
+    assert m_nord["coverage_pct"] == 100.0
+    assert m_nord["mae_mw"] == 2346.83
+    assert m_nord["bias_mw"] == -2079.43
+    assert m_nord["rmse_mw"] == 3000.66
+    assert m_nord["wape_pct"] == 17.10
+
+    # Mode 3: NESO Schedule (D-1 17:00 London) - Hourly Native
+    r_neso = client.get(
+        "/api/v1/evaluation",
+        params={"date_from": "2026-01-01", "date_to": "2026-01-05", "granularity": "hourly", "cutoff_type": "rolling_da", "da_cutoff_time": "17:00"}
+    )
+    assert r_neso.status_code == 200
+    m_neso = r_neso.json()["metrics"]
+    assert m_neso["valid_pairs_count"] == 120
+    assert m_neso["coverage_pct"] == 100.0
+    assert m_neso["mae_mw"] == 2461.78
+    assert m_neso["bias_mw"] == -2362.66
+    assert m_neso["rmse_mw"] == 3123.58
+    assert m_neso["wape_pct"] == 17.93
+
+    # Mode 4: Retrospective Pre-Delivery (Latest before delivery start) - Hourly Native
+    r_retro = client.get(
+        "/api/v1/evaluation",
+        params={"date_from": "2026-01-01", "date_to": "2026-01-05", "granularity": "hourly", "cutoff_type": "latest"}
+    )
+    assert r_retro.status_code == 200
+    m_retro = r_retro.json()["metrics"]
+    assert m_retro["valid_pairs_count"] == 120
+    assert m_retro["coverage_pct"] == 100.0
+    assert m_retro["mae_mw"] == 2413.43
+    assert m_retro["bias_mw"] == -1534.86
+    assert m_retro["rmse_mw"] == 3096.52
+    assert m_retro["wape_pct"] == 17.58
+
+    # Mode 5: Fixed Point-in-Time Snapshot (Dec 31, 2025, 11:30 UTC) - Hourly
+    r_snap = client.get(
+        "/api/v1/evaluation",
+        params={"date_from": "2026-01-01", "date_to": "2026-01-05", "granularity": "hourly", "cutoff_type": "snapshot", "decision_cutoff": "2025-12-31T11:30:00Z"}
+    )
+    assert r_snap.status_code == 200
+    snap_data = r_snap.json()
+    m_snap = snap_data["metrics"]
+    # Exactly 46 hours (92 half-hours) valid due to 74h forecast horizon
+    assert m_snap["valid_pairs_count"] == 46
+    assert m_snap["coverage_pct"] == 38.33
+    assert m_snap["mae_mw"] == 930.46
+    assert m_snap["bias_mw"] == -486.54
+    assert m_snap["rmse_mw"] == 1175.20
+    assert m_snap["wape_pct"] == 5.69
+    # Must contain quality flags qualifying low coverage and point-in-time nature
+    flags_str = " ".join(snap_data["quality_flags"])
+    assert "POINT_IN_TIME_SNAPSHOT" in flags_str
+    assert "LOW_COVERAGE_WARNING" in flags_str
+
+def test_metric_formula_falsifiability():
+    """Verify that accuracy metrics are mathematically sensitive and strictly falsifiable."""
+    from app.services.metrics import calculate_accuracy_metrics
+
+    # Test baseline: Actual = 1000, Forecast = 800 -> Error = +200
+    baseline = [{"status": "VALID", "actual_mw": 1000.0, "forecast_mw": 800.0}]
+    m = calculate_accuracy_metrics(baseline, expected_count=1)
+    assert m.bias_mw == 200.0
+    assert m.mae_mw == 200.0
+    assert m.rmse_mw == 200.0
+    assert m.wape_pct == 20.0
+
+    # If bias convention were inverted (F - A instead of A - F), it would equal -200.0
+    # Confirm our code rejects -200.0
+    assert m.bias_mw != -200.0
+
+    # If denominator were forecast instead of actual (MAPE vs WAPE), error would be 200/800 = 25.0%
+    assert m.wape_pct != 25.0
+
 
 
 

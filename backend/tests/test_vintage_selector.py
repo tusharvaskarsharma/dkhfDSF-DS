@@ -130,3 +130,43 @@ def test_bst_daylight_saving_cutoff():
     # D-1 is 2026-07-14; 11:00 BST is 10:00 UTC
     assert utc_str == "2026-07-14T10:00:00Z"
 
+def test_later_published_hindcast_cannot_replace_eligible_forecast():
+    """
+    Prove that a later-published NWP hindcast or assimilation record
+    (even with a higher database ID and later publication timestamp)
+    CANNOT replace an eligible earlier forecast for a historical trading decision.
+    """
+    delivery = "2026-01-02T12:00:00Z"
+    
+    # Target delivery: 2026-01-02T12:00:00Z.
+    # D-1 is 2026-01-01. Order book cutoff for EPEX SPOT 09:20 London is 2026-01-01T09:20:00Z.
+    # Four candidate records in the database:
+    # 1. Run 1 published 2026-01-01T07:30:00Z (eligible for DA trading): 10,000 MW, ID 10
+    # 2. Run 2 published 2026-01-01T15:30:00Z (post-DA auction, pre-delivery): 12,000 MW, ID 20
+    # 3. Run 3 published 2026-01-02T14:00:00Z (post-delivery NWP assimilation tail): 14,000 MW, ID 900
+    # 4. Run 4 published 2026-01-03T06:00:00Z (ex-post next-day reanalysis): 15,000 MW, ID 1200
+    vintages = [
+        {"id": 10, "delivery_time": delivery, "publish_time": "2026-01-01T07:30:00Z", "generation_mw": 10000.0, "retrieval_time": "2026-01-01T08:00:00Z"},
+        {"id": 20, "delivery_time": delivery, "publish_time": "2026-01-01T15:30:00Z", "generation_mw": 12000.0, "retrieval_time": "2026-01-01T16:00:00Z"},
+        {"id": 900, "delivery_time": delivery, "publish_time": "2026-01-02T14:00:00Z", "generation_mw": 14000.0, "retrieval_time": "2026-01-02T14:30:00Z"},
+        {"id": 1200, "delivery_time": delivery, "publish_time": "2026-01-03T06:00:00Z", "generation_mw": 15000.0, "retrieval_time": "2026-01-03T06:30:00Z"},
+    ]
+    
+    # 1. Day-Ahead Operational Decision (EPEX SPOT 09:20 London cutoff on D-1):
+    sel_da = select_forecast_for_delivery(vintages, decision_cutoff="2026-01-01T09:20:00Z", delivery_time=delivery)
+    assert sel_da is not None
+    assert sel_da["id"] == 10
+    assert sel_da["generation_mw"] == 10000.0
+    assert sel_da["publish_time"] == "2026-01-01T07:30:00Z"
+    
+    # 2. Retrospective Latest Pre-Delivery (decision_cutoff is None, delivery_time=delivery):
+    # Runs 1 & 2 published before delivery start (2026-01-02T12:00:00Z).
+    # Runs 3 & 4 are post-delivery assimilation records (publish_time > delivery_time).
+    # The selector MUST select Run 2 (15:30:00Z on D-1, 12,000 MW), rejecting Runs 3 & 4 despite their higher IDs.
+    sel_retro = select_forecast_for_delivery(vintages, decision_cutoff=None, delivery_time=delivery)
+    assert sel_retro is not None
+    assert sel_retro["id"] == 20
+    assert sel_retro["generation_mw"] == 12000.0
+    assert sel_retro["publish_time"] == "2026-01-01T15:30:00Z"
+
+

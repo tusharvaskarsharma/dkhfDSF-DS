@@ -212,12 +212,16 @@ async def evaluate_forecasts(
     if cutoff_type == "rolling_da":
         quality_flags.append(f"DAY_AHEAD_OPERATIONAL: For each delivery day D, evaluated against forecast published prior to D-1 {da_cutoff_time} London local time (GB Day-Ahead Auction cutoff).")
     elif cutoff_type == "snapshot":
-        quality_flags.append(f"POINT_IN_TIME_SNAPSHOT: Single cutoff applied at {decision_cutoff}. Later intervals without published vintages prior to this instant are marked MISSING_FORECAST.")
+        quality_flags.append(
+            f"POINT_IN_TIME_SNAPSHOT: Single cutoff applied at {decision_cutoff}. "
+            f"Due to the ~74h forecast horizon, intervals beyond the horizon are MISSING_FORECAST (low coverage). "
+            f"These metrics reflect a single historical model run and must NOT be compared directly to 100% rolling day-ahead benchmarks without qualification."
+        )
     else:
         quality_flags.append("RETROSPECTIVE_BENCHMARK: Evaluated against latest available forecast published prior to delivery start (strictly publish_time <= delivery_time; ex-post runs excluded).")
 
     if metrics.coverage_pct < 80.0:
-        quality_flags.append(f"LOW_COVERAGE_WARNING: Paired coverage is {metrics.coverage_pct}% (below 80%).")
+        quality_flags.append(f"LOW_COVERAGE_WARNING: Paired coverage is {metrics.coverage_pct}% (below 80% threshold). Metrics represent a partial-period sample.")
     if metrics.missing_forecast_count > 0:
         quality_flags.append(f"MISSING_FORECASTS: {metrics.missing_forecast_count} intervals have no eligible forecast before cutoff.")
     if metrics.missing_actual_count > 0:
