@@ -1,0 +1,39 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: uk_wind_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_PATH=/app/data/wind_forecast.db
+      - ELEXON_BASE_URL=https://data.elexon.co.uk/bmrs/api/v1
+      - ELEXON_TIMEOUT_SECONDS=20.0
+      - ELEXON_MAX_RETRIES=3
+      - ALLOW_FIXTURE_FALLBACK=true
+    volumes:
+      - sqlite_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: uk_wind_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  sqlite_data:
+    driver: local

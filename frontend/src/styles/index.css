@@ -1,0 +1,262 @@
+:root {
+  --bg-primary: #080C14;
+  --bg-secondary: #0D1321;
+  --bg-card: rgba(17, 25, 40, 0.75);
+  --bg-card-hover: rgba(23, 34, 54, 0.85);
+  --bg-card-solid: #111A29;
+  
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-focus: rgba(56, 189, 248, 0.4);
+  --border-active: rgba(56, 189, 248, 0.8);
+  
+  --text-main: #F3F4F6;
+  --text-muted: #9CA3AF;
+  --text-faint: #6B7280;
+  
+  /* Domain Accents */
+  --wind-cyan: #38BDF8;
+  --wind-cyan-glow: rgba(56, 189, 248, 0.25);
+  --actual-emerald: #10B981;
+  --actual-emerald-glow: rgba(16, 185, 129, 0.25);
+  --cutoff-amber: #F59E0B;
+  --cutoff-amber-glow: rgba(245, 158, 11, 0.25);
+  
+  --error-positive: #34D399; /* underforecast */
+  --error-negative: #F43F5E; /* overforecast */
+  
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  
+  --shadow-float: 0 12px 32px -4px rgba(0, 0, 0, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.4);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-primary);
+  background-image: 
+    radial-gradient(ellipse 900px 500px at 50% -100px, rgba(14, 165, 233, 0.1), transparent),
+    radial-gradient(ellipse 600px 400px at 100% 80%, rgba(16, 185, 129, 0.05), transparent);
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* Tabular numbers for all financial & measurement metrics */
+.tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Glassmorphism Cards */
+.terminal-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-float);
+  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.terminal-card:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Terminal Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0.5rem 0.875rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  text-decoration: none;
+}
+
+.btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.25), rgba(2, 132, 199, 0.2));
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #BAE6FD;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.4), rgba(2, 132, 199, 0.35));
+  border-color: var(--wind-cyan);
+  box-shadow: 0 0 15px var(--wind-cyan-glow);
+}
+
+.btn-emerald {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(5, 150, 105, 0.2));
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #A7F3D0;
+}
+
+.btn-emerald:hover {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.4), rgba(5, 150, 105, 0.35));
+  border-color: var(--actual-emerald);
+  box-shadow: 0 0 15px var(--actual-emerald-glow);
+}
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: var(--font-mono);
+}
+
+.badge-cyan {
+  background: rgba(56, 189, 248, 0.12);
+  color: #38BDF8;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.badge-emerald {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34D399;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.badge-amber {
+  background: rgba(245, 158, 11, 0.12);
+  color: #FBBF24;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.badge-rose {
+  background: rgba(244, 63, 94, 0.12);
+  color: #FB7185;
+  border: 1px solid rgba(244, 63, 94, 0.25);
+}
+
+.badge-muted {
+  background: rgba(255, 255, 255, 0.05);
+  color: #9CA3AF;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Navigation Tabs */
+.nav-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.nav-tab:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.nav-tab.active {
+  color: var(--wind-cyan);
+  border-bottom-color: var(--wind-cyan);
+  background: rgba(56, 189, 248, 0.04);
+}
+
+/* Inputs & Selects */
+.input-field, .select-field {
+  background: rgba(13, 19, 33, 0.8);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  padding: 0.45rem 0.65rem;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input-field:focus, .select-field:focus {
+  border-color: var(--wind-cyan);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+}
+
+/* Tables */
+.terminal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.terminal-table th {
+  text-align: left;
+  padding: 0.65rem 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.02);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.terminal-table td {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  color: var(--text-main);
+}
+
+.terminal-table tr:hover td {
+  background: rgba(56, 189, 248, 0.03);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
