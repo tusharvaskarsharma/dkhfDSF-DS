@@ -7,7 +7,7 @@
 *.db
 *.db-wal
 *.db-shm
-data/
+/data/
 
 # Python
 __pycache__/

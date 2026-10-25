@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Query, HTTPException, Response
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date, timedelta, timezone
+from starlette.concurrency import run_in_threadpool
 
 from app.core.config import settings
 from app.core.time_utils import (
@@ -45,7 +46,7 @@ router = APIRouter()
 async def get_health():
     """System health check and Elexon API connectivity status."""
     connected, latency, err = await elexon_client.check_api_health()
-    stats = get_cache_stats()
+    stats = await run_in_threadpool(get_cache_stats)
     
     return HealthResponse(
         status="HEALTHY" if connected else "DEGRADED",
@@ -149,11 +150,11 @@ async def evaluate_forecasts(
     if mode == "demo":
         source_mode = "FIXTURE_DEMO"
         # Ensure fixtures are loaded into DB
-        load_fixture_data_into_db()
+        await run_in_threadpool(load_fixture_data_into_db)
         quality_flags.append("DEMO_FIXTURE_MODE: Results generated from deterministic offline test fixtures.")
     else:
         # Check if records are cached in SQLite
-        cached_actuals = get_actual_records(date_from=date_from, date_to=date_to)
+        cached_actuals = await run_in_threadpool(get_actual_records, date_from=date_from, date_to=date_to)
         if not cached_actuals and mode != "demo":
             # Attempt to fetch from live Elexon API
             try:
@@ -166,18 +167,18 @@ async def evaluate_forecasts(
             except Exception as e:
                 if settings.ALLOW_FIXTURE_FALLBACK:
                     source_mode = "FIXTURE_DEMO"
-                    load_fixture_data_into_db()
+                    await run_in_threadpool(load_fixture_data_into_db)
                     quality_flags.append(f"LIVE_API_UNAVAILABLE: {str(e)[:150]}. Showing deterministic fixture data.")
                 else:
                     raise HTTPException(status_code=502, detail=f"Failed to fetch live data: {str(e)}")
 
     # Retrieve from DB
-    actuals = get_actual_records(date_from=date_from, date_to=date_to)
+    actuals = await run_in_threadpool(get_actual_records, date_from=date_from, date_to=date_to)
     
     # Calculate bounds for forecasts
     d_start_iso = f"{date_from}T00:00:00Z"
     d_end_iso = f"{date_to}T23:59:59Z"
-    raw_forecasts = get_forecast_records(delivery_from=d_start_iso, delivery_to=d_end_iso)
+    raw_forecasts = await run_in_threadpool(get_forecast_records, delivery_from=d_start_iso, delivery_to=d_end_iso)
 
     # Apply Decision Cutoff & Vintage Selection
     selected_forecasts_by_hour = select_forecasts_for_delivery_intervals(
