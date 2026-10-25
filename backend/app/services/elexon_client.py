@@ -120,6 +120,7 @@ class ElexonClient:
             raise ValueError("publish_to must be >= publish_from")
 
         all_records = []
+        seen_keys = set()
         curr = dt_start
         url = f"{self.base_url}/datasets/WINDFOR"
 
@@ -133,8 +134,12 @@ class ElexonClient:
 
             try:
                 data = await self._request_with_retry(url, params)
-                items = data.get("data", [])
+                items = data.get("data", []) or []
                 for it in items:
+                    rec_key = (it["publishTime"], it["startTime"])
+                    if rec_key in seen_keys:
+                        continue
+                    seen_keys.add(rec_key)
                     all_records.append({
                         "dataset": "WINDFOR",
                         "publish_time": it["publishTime"],
@@ -148,7 +153,9 @@ class ElexonClient:
                 log_sync("WINDFOR", f"{params['publishDateTimeFrom']}..{params['publishDateTimeTo']}", 0, "FAILED", str(e))
                 raise
 
-            curr = chunk_end + timedelta(seconds=1)
+            if chunk_end >= dt_end:
+                break
+            curr = chunk_end
 
         # Cache in SQLite
         upsert_forecasts(all_records)
